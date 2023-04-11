@@ -13,6 +13,7 @@ name = "zero2prod"
 [dependencies]
 axum = {version = "0.6.12", features = ["query"]}
 hyper = "0.14.25"
+serde = {version = "1.0.160", features = ["derive"]}
 tokio = {version = "1.27.0", features = ["macros", "rt-multi-thread"]}
 tower-http = {version = "0.4.0", features = ["cors"]}
 
