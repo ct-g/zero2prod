@@ -19,7 +19,6 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server<hyper::serve
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .layer(Extension(db_pool));
-        //.with_state(connection);
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());
