@@ -1,2 +1,19 @@
 Chapter 4.5.14
     Not implemented here
+
+Building
+    See if sqlx metadata requires updating or not.
+        cargo sqlx prepare -- --check
+
+    Generate metadata for sql queries. Necessary for docker image to build successfully.
+    Uses sqlx offline features.
+        cargo sqlx prepare -- --lib
+
+    Build docker image. The '.' argument gives current directory as build context.
+    I.e. nothing outside this directory can be accessed when building the docker image.
+        docker build --tag zero2prod --file Dockerfile .
+
+Running
+    The argument -p forces the container to expose its ports for networking.
+        docker run -p 8000:8000 zero2prod
+
