@@ -17,3 +17,6 @@ Running
     The argument -p forces the container to expose its ports for networking.
         docker run -p 8000:8000 zero2prod
 
+    Pipe into bunyan for formatted logs
+        docker run -p 8000:8000 zero2prod | bunyan
+

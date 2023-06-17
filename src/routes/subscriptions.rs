@@ -24,7 +24,7 @@ pub struct FormData {
     skip(form, pool),
     fields(
         request_id = %Uuid::new_v4(),
-        subscirber_email = %form.email,
+        subscriber_email = %form.email,
         subscriber_name = %form.name
     )
 )]
