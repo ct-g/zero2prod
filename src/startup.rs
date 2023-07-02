@@ -1,3 +1,4 @@
+use crate::email_client::EmailClient;
 use crate::routes::{health_check, subscribe};
 
 use sqlx::PgPool;
@@ -11,14 +12,20 @@ use axum::{
 
 use std::{net::TcpListener, sync::Arc};
 
-pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, hyper::Error> {
+pub fn run(
+    listener: TcpListener,
+    db_pool: PgPool,
+    email_client: EmailClient
+) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, hyper::Error> {
     // State must be cloneable for the into_make_service call
     let db_pool = Arc::new(db_pool);
+    let email_client = Arc::new(email_client);
 
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .layer(Extension(db_pool));
+        .layer(Extension(db_pool))
+        .layer(Extension(email_client));
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());
