@@ -18,6 +18,7 @@ Migrations
         SKIP_DOCKER=true ./scripts/init_db.sh
 
     Production - temporarily set database to accept untrusted sources before running this
+    Remember to update sqlx-data.json file for compatibility
         DATABASE_URL=postgresql://newsletter:AVNS_W9lGxKOeSOsse87cNOV@app-e6a0bef5-6538-4362-9a0d-029e39ca7d76-do-user-14251180-0.b.db.ondigitalocean.com:25060/newsletter?sslmode=require sqlx migrate run
 
 Running
