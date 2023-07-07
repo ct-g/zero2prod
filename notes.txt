@@ -3,7 +3,7 @@ Chapter 4.5.14
 
 Building
     See if sqlx metadata requires updating or not.
-        cargo sqlx prepare -- --check
+        cargo sqlx prepare --check
 
     Generate metadata for sql queries. Necessary for docker image to build successfully.
     Uses sqlx offline features.
