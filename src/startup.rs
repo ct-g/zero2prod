@@ -1,6 +1,6 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, subscribe};
+use crate::routes::{health_check, subscribe, confirm};
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -18,6 +18,9 @@ pub struct Application {
     port: u16,
     server: Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>,
 }
+
+#[derive(Clone  )]
+pub struct ApplicationBaseUrl(pub String);
 
 impl Application {
     pub async fn build(
@@ -40,7 +43,12 @@ impl Application {
         let address = format!("{}:{}", configuration.application.host, configuration.application.port);
         let listener = TcpListener::bind(address).expect("Unable to bind to address");
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool, email_client)?;
+        let server = run(
+            listener,
+            connection_pool,
+            email_client,
+            configuration.application.base_url,
+        )?;
 
         Ok(Self { port, server })
     }
@@ -65,17 +73,21 @@ pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
-    email_client: EmailClient
+    email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, hyper::Error> {
-    // State must be cloneable for the into_make_service call
+    // State must be cloneable for the into_make_service call, hence Arc
     let db_pool = Arc::new(db_pool);
     let email_client = Arc::new(email_client);
+    let base_url = ApplicationBaseUrl(base_url);
 
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
+        .route("/subscriptions/confirm", get(confirm))
         .layer(Extension(db_pool))
-        .layer(Extension(email_client));
+        .layer(Extension(email_client))
+        .layer(Extension(base_url));
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());
