@@ -1,5 +1,7 @@
 Chapter 4.5.14
-    Not implemented here
+    Not fully implemented here, implementation is limited compared to tracing-actix-web
+Chapter 8.2
+    Logs do not match due to lack of tracing-actix-web
 
 Building
     See if sqlx metadata requires updating or not.

@@ -11,6 +11,9 @@ use axum::{
     routing::{get, post, IntoMakeService},
     Server, // Re-export of Server from hyper crate
 };
+use tower_http::trace::{TraceLayer, self};
+use tower::ServiceBuilder;
+use tracing::Level;
 
 use std::{net::TcpListener, sync::Arc};
 
@@ -85,9 +88,24 @@ pub fn run(
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
+        .layer(
+            ServiceBuilder::new()
+                .layer(
+                    TraceLayer::new_for_http()
+                        .make_span_with(
+                            trace::DefaultMakeSpan::new()
+                                .level(Level::INFO)
+                            )
+                        .on_response(
+                            trace::DefaultOnResponse::new()
+                                .level(Level::INFO)
+                        )
+                )
+        )
         .layer(Extension(db_pool))
         .layer(Extension(email_client))
         .layer(Extension(base_url));
+        
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());
