@@ -10,7 +10,6 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use sqlx::PgPool;
-use tracing::Subscriber;
 
 use std::sync::Arc;
 
