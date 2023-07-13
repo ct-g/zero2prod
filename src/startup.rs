@@ -1,6 +1,6 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, subscribe, confirm};
+use crate::routes::{health_check, subscribe, confirm, publish_newsletter};
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -88,6 +88,7 @@ pub fn run(
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
+        .route("/newsletters", post(publish_newsletter))
         .layer(
             ServiceBuilder::new()
                 .layer(

@@ -141,7 +141,7 @@ pub async fn send_confirmation_email(
     );
     email_client
         .send_email(
-            new_subscriber.email,
+            &new_subscriber.email,
             "Welcome!",
             &html_body,
             &plain_body,            
@@ -226,15 +226,7 @@ impl std::fmt::Display for StoreTokenError {
     }
 }
 
-/*impl IntoResponse for StoreTokenError {
-    fn into_response(self) -> Response {
-        let body = "A database error was encountered while trying to store a subscription token.";
-
-        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
-    }
-}*/
-
-fn error_chain_fmt(
+pub fn error_chain_fmt(
     e: &impl std::error::Error,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
