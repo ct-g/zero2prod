@@ -6,9 +6,13 @@ use anyhow::Context;
 use axum::{
     Extension,
     extract,
-    http::StatusCode, response::{IntoResponse, Response}
+    http::{Request, header::HeaderMap, header::HeaderValue, StatusCode},
+    response::{IntoResponse, Response}
 };
 use axum_macros::debug_handler;
+use base64::Engine;
+use hyper::header;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 
 use std::sync::Arc;
@@ -31,6 +35,8 @@ pub struct Content {
 
 #[derive(thiserror::Error)]
 pub enum PublishError {
+    #[error("Authentication failed")]
+    AuthError(#[source] anyhow::Error),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error)
 }
@@ -43,16 +49,46 @@ impl std::fmt::Debug for PublishError {
 
 impl IntoResponse for PublishError {
     fn into_response(self) -> Response {
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        match self {
+            PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            PublishError::AuthError(_) => {
+                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
+                let mut response = StatusCode::UNAUTHORIZED.into_response();
+                response
+                    .headers_mut()
+                    .insert(header::WWW_AUTHENTICATE, header_value);
+                response
+            }
+        }
     }
 }
 
+struct Credentials {
+    username: String,
+    password: Secret<String>,
+}
+
 #[debug_handler]
+#[tracing::instrument(
+    name = "Publish a newsletter issue",
+    skip(body, pool, email_client, headers),
+    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+)]
 pub async fn publish_newsletter(
     Extension(pool): Extension<Arc<PgPool>>,
     Extension(email_client): Extension<Arc<EmailClient>>,
+    headers: HeaderMap,
     extract::Json(body): extract::Json<BodyData>
 ) -> Result<StatusCode, PublishError> {
+    let credentials = basic_authentication(&headers)
+        .map_err(PublishError::AuthError)?;
+    tracing::Span::current().record(
+        "username",
+        &tracing::field::display(&credentials.username)
+    );
+    let user_id = validate_credentials(credentials, &pool).await?;
+    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+
     let subscribers = get_confirmed_subscribers(&pool).await?;
     for subscriber in subscribers {
         match subscriber {
@@ -80,6 +116,66 @@ pub async fn publish_newsletter(
 
     }
     Ok(StatusCode::OK)
+}
+
+fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
+    let header_value = headers
+        .get("Authorization")
+        .context("The 'Authorization' header was missing")?
+        .to_str()
+        .context("The 'Authorization' header was not a valid UTF8 string")?;
+    let base64encoded_segment = header_value
+        .strip_prefix("Basic ")
+        .context("The authorization scheme was not 'Basic'.")?;
+    let decoded_bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64encoded_segment)
+        .context("Failed to base64-decode 'Basic' credentials.")?;
+    let decoded_credentials = String::from_utf8(decoded_bytes)
+        .context("The decoded credential string is not valid UTF8")?;
+
+    // Split into username:password
+    let mut credentials = decoded_credentials.splitn(2, ':');
+    let username = credentials
+        .next()
+        .ok_or_else(|| {
+            anyhow::anyhow!("A username must be provided in 'Basic' auth.")
+        })?
+        .to_string();
+    let password = credentials
+        .next()
+        .ok_or_else(|| {
+            anyhow::anyhow!("A password must be provided in 'Basic' auth.")
+        })?
+        .to_string();
+    
+    Ok(Credentials {
+        username,
+        password: Secret::new(password)
+    })
+}
+
+async fn validate_credentials(
+    credentials: Credentials,
+    pool: &PgPool,
+) -> Result<uuid::Uuid, PublishError> {
+    let user_id: Option<_> = sqlx::query!(
+        r#"
+        SELECT user_id
+        FROM users
+        WHERE username = $1 AND password = $2
+        "#,
+        credentials.username,
+        credentials.password.expose_secret()
+    )
+    .fetch_optional(pool)
+    .await
+    .context("Failed to perform a query to validate auth credentials")
+    .map_err(PublishError::UnexpectedError)?;
+
+    user_id
+        .map(|row| row.user_id)
+        .ok_or_else(|| anyhow::anyhow!("Invalid username or password"))
+        .map_err(PublishError::AuthError)
 }
 
 #[tracing::instrument(name = "Get confirmed subscribers", skip(pool))]
