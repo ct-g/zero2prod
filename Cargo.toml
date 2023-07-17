@@ -12,6 +12,7 @@ name = "zero2prod"
 
 [dependencies]
 anyhow = "1.0.71"
+argon2 = {version = "0.5.1", features = ["std"]}
 axum = {version = "0.6.12", features = ["json", "query"]}
 axum-macros = "0.3.7"
 base64 = "0.21.2"
