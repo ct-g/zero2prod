@@ -1,6 +1,6 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, subscribe, confirm, publish_newsletter};
+use crate::routes::{health_check, home, subscribe, confirm, publish_newsletter};
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -85,6 +85,7 @@ pub fn run(
     let base_url = ApplicationBaseUrl(base_url);
 
     let app = Router::new()
+        .route("/", get(home))
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
