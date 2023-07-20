@@ -3,6 +3,10 @@ Chapter 4.5.14
 Chapter 8.2
     Logs do not match due to lack of tracing-actix-web
 
+ToDo
+    Investigate usage of Axum's typed headers from "headers" feature flag
+    Investigate axum-extra library features to improve legibility
+
 Building
     See if sqlx metadata requires updating or not.
         cargo sqlx prepare --check
