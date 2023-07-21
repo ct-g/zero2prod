@@ -4,7 +4,6 @@ use crate::email_client::EmailClient;
 use crate::routes::error_chain_fmt;
 
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     Extension,
     extract,
@@ -14,7 +13,7 @@ use axum::{
 use axum_macros::debug_handler;
 use base64::Engine;
 use hyper::header;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::Secret;
 use sqlx::PgPool;
 
 use std::sync::Arc;

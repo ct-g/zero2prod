@@ -14,10 +14,12 @@ name = "zero2prod"
 anyhow = "1.0.71"
 argon2 = {version = "0.5.1", features = ["std"]}
 axum = {version = "0.6.12", features = ["json", "query"]}
+axum-extra = {version = "0.7.5", features = ["cookie"]}
 axum-macros = "0.3.7"
 base64 = "0.21.2"
 chrono = {version = "0.4.24", default-features = false, features = ["clock"]}
 config = "0.13.3"
+htmlescape = "0.3.1"
 hyper = "0.14.25"
 once_cell = "1.17.1"
 rand = {version = "0.8.5", features = ["std_rng"]}
@@ -25,6 +27,8 @@ secrecy = {version = "0.8.0", features = ["serde"]}
 serde = {version = "1.0.160", features = ["derive"]}
 serde-aux = "4"
 thiserror = "1.0.43"
+# time used purely to set max_age on cookies, use chrono otherwise
+time = "0.3.23"
 tokio = {version = "1.27.0", features = ["macros", "rt-multi-thread"]}
 tower = "0.4.13"
 tower-http = {version = "0.4.0", features = ["cors", "trace"]}
@@ -33,13 +37,14 @@ tracing-bunyan-formatter = "0.3.7"
 tracing-log = "0.1.3"
 tracing-subscriber = {version = "0.3.17", features = ["registry", "env-filter"]}
 unicode-segmentation = "1.10.1"
+urlencoding = "2.1.2"
 uuid = {version = "1.3.1", features = ["v4"]}
 validator = "0.16.1"
 
 [dependencies.reqwest]
 version = "0.11.16"
 default-features = false
-features = ["json", "rustls-tls"]
+features = ["json", "rustls-tls", "cookies"]
 
 [dependencies.sqlx]
 version = "0.6.3"

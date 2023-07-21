@@ -5,11 +5,13 @@ use axum::{
     Extension,
     Form,
     http::{
-        header::{self, HeaderValue},
+        header::{self, HeaderValue, HeaderMap},
         StatusCode
     },
     response::{IntoResponse, Response}
 };
+use axum_extra::extract::CookieJar;
+use axum_extra::extract::cookie::Cookie;
 use secrecy::Secret;
 use sqlx::PgPool;
 
@@ -37,10 +39,15 @@ impl std::fmt::Debug for LoginError {
 
 impl IntoResponse for LoginError {
     fn into_response(self) -> Response {
-        match self {
-            LoginError::AuthError(_) => StatusCode::UNAUTHORIZED.into_response(),
-            LoginError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
+        let encoded_error = urlencoding::Encoded::new(self.to_string());
+        let mut response = StatusCode::SEE_OTHER.into_response();
+        let header_value = HeaderValue::from_str(
+            &format!("/login?error={}", encoded_error)
+        ).unwrap();
+        response
+            .headers_mut()
+            .insert(header::LOCATION, header_value);
+        response
     }
 }
 
@@ -51,27 +58,41 @@ impl IntoResponse for LoginError {
 pub async fn login(
     Extension(pool): Extension<Arc<PgPool>>,
     form: Form<FormData>
-) -> Result<Response, LoginError> {
+) -> Result<Response, Response> {
     let credentials = Credentials {
         username: form.0.username,
         password: form.0.password,
     };
     tracing::Span::current()
         .record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &pool)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
-        })?;
-    tracing::Span::current()
-        .record("user_id", &tracing::field::display(&user_id));
-    Ok({
-        let mut response = StatusCode::SEE_OTHER.into_response();
+
+    match validate_credentials(credentials, &pool).await {
+        Ok(user_id) => {
+            tracing::Span::current()
+                .record("user_id", &tracing::field::display(&user_id));
+            let mut response = StatusCode::SEE_OTHER.into_response();
             let header_value = HeaderValue::from_str("/").unwrap();
             response
                 .headers_mut()
                 .insert(header::LOCATION, header_value);
-            response
-    })
+            Ok(response)
+        },
+        Err(e) => {
+            let e = match e {
+                AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
+                AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
+            };
+
+            let header_value = HeaderValue::from_str(&format!("/login")).unwrap();
+            let mut headers = HeaderMap::new();
+            headers.insert(header::LOCATION, header_value);
+            let cookies = CookieJar::new()
+                .add(
+                    Cookie::build("_flash", e.to_string())
+                        .max_age(time::Duration::seconds(1))
+                        .finish()
+                );
+            Err((StatusCode::SEE_OTHER, headers, cookies).into_response())
+        },
+    }
 }

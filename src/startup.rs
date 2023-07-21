@@ -11,6 +11,7 @@ use axum::{
     routing::{get, post, IntoMakeService},
     Server, // Re-export of Server from hyper crate
 };
+use secrecy::Secret;
 use tower_http::trace::{TraceLayer, self};
 use tower::ServiceBuilder;
 use tracing::Level;
@@ -73,6 +74,8 @@ pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     )
 }
 
+pub struct HmacSecret(pub Secret<String>);
+
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
@@ -108,8 +111,7 @@ pub fn run(
         )
         .layer(Extension(db_pool))
         .layer(Extension(email_client))
-        .layer(Extension(base_url));
-        
+        .layer(Extension(base_url));        
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());

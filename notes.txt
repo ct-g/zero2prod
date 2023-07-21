@@ -2,6 +2,8 @@ Chapter 4.5.14
     Not fully implemented here, implementation is limited compared to tracing-actix-web
 Chapter 8.2
     Logs do not match due to lack of tracing-actix-web
+Chapter 10.6.4.5
+    Using Result<Response, Response>, need to check output to see if this logs errors as this section intends
 
 ToDo
     Investigate usage of Axum's typed headers from "headers" feature flag
