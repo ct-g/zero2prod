@@ -1,56 +1,65 @@
 use axum::{
     http::{
-        header::{self, HeaderValue},
+        header::{self, HeaderValue, HeaderMap},
         StatusCode
     },
     response::{IntoResponse, Response},
 };
-use axum_extra::extract::CookieJar;
+use axum_flash::{IncomingFlashes, Level};
+
+use std::fmt::Write;
 
 pub async fn login_form(
-    jar: CookieJar
+    flashes: IncomingFlashes,
 ) -> Response {
-    let error_html = match jar.get("_flash") {
-        None => "".into(),
-        Some(cookie) => {
-            format!("<p><i>{}</i></p>", cookie.value())
-        }
-    };
+    let mut error_html = String::new();
+    for (_, msg) in flashes.iter().filter(|(l, _)| *l == Level::Error) {
+        writeln!(
+            error_html,
+            "<p><i>{}</i></p>",
+            msg
+        ).unwrap();
+    }
 
-    let mut response = 
-        (StatusCode::OK, format!(
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str("text/html; charset=utf-8").unwrap(),
+    );
+
+    (
+        StatusCode::OK,
+        headers,
+        flashes, // Flashes must be in returned data in order to be removed from client
+        format!(
             r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta http-equiv="content-type" content="text/html; charset=utf-8">
-    <title>Login</title>
-</head>
-<body>
-    {error_html}
-    <form action="/login" method="post">
-        <label>Username
-            <input
-                type="text"
-                placeholder="Enter Username"
-                name="username"
-            >
-        </label>
-        <label>Password
-            <input
-                type="password"
-                placeholder="Enter Password"
-                name="password"
-            >
-        </label>
-        <button type="submit">Login</button>
-    </form>
-</body>
-</html>"#,
-        ))
-        .into_response();
-    let header_value = HeaderValue::from_str("text/html; charset=utf-8").unwrap();
-    response
-        .headers_mut()
-        .insert(header::CONTENT_TYPE, header_value);
-    response
+            <html lang="en">
+            <head>
+                <meta http-equiv="content-type" content="text/html; charset=utf-8">
+                <title>Login</title>
+            </head>
+            <body>
+                {error_html}
+                <form action="/login" method="post">
+                    <label>Username
+                        <input
+                            type="text"
+                            placeholder="Enter Username"
+                            name="username"
+                        >
+                    </label>
+                    <label>Password
+                        <input
+                            type="password"
+                            placeholder="Enter Password"
+                            name="password"
+                        >
+                    </label>
+                    <button type="submit">Login</button>
+                </form>
+            </body>
+            </html>"#,
+        )
+    )
+    .into_response()
 }

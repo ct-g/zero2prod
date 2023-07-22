@@ -5,13 +5,12 @@ use axum::{
     Extension,
     Form,
     http::{
-        header::{self, HeaderValue, HeaderMap},
+        header::{self, HeaderValue},
         StatusCode
     },
     response::{IntoResponse, Response}
 };
-use axum_extra::extract::CookieJar;
-use axum_extra::extract::cookie::Cookie;
+use axum_flash::Flash;
 use secrecy::Secret;
 use sqlx::PgPool;
 
@@ -52,11 +51,12 @@ impl IntoResponse for LoginError {
 }
 
 #[tracing::instrument(
-    skip(form, pool),
+    skip(form, pool, flash),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn login(
     Extension(pool): Extension<Arc<PgPool>>,
+    flash: Flash,
     form: Form<FormData>
 ) -> Result<Response, Response> {
     let credentials = Credentials {
@@ -83,16 +83,9 @@ pub async fn login(
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
             };
 
-            let header_value = HeaderValue::from_str(&format!("/login")).unwrap();
-            let mut headers = HeaderMap::new();
-            headers.insert(header::LOCATION, header_value);
-            let cookies = CookieJar::new()
-                .add(
-                    Cookie::build("_flash", e.to_string())
-                        .max_age(time::Duration::seconds(1))
-                        .finish()
-                );
-            Err((StatusCode::SEE_OTHER, headers, cookies).into_response())
+            let flash = flash.error(e.to_string());
+            let response = axum::response::Redirect::to("/login");
+            Err((flash, response).into_response())
         },
     }
 }

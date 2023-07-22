@@ -208,6 +208,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-flash"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "919d104c8fdd083e19a9ba8b579b1c10ecea38c131a65acdea052a6af561d397"
+dependencies = [
+ "async-trait",
+ "axum-core",
+ "axum-extra",
+ "base64 0.21.2",
+ "cookie 0.17.0",
+ "http",
+ "serde",
+ "serde_json",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "axum-macros"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -378,7 +396,12 @@ version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7efb37c3e1ccb1ff97164ad95ac1606e8ccd35b3fa0a7d99a304c7f4a428cc24"
 dependencies = [
+ "base64 0.21.2",
+ "hmac",
  "percent-encoding",
+ "rand 0.8.5",
+ "sha2",
+ "subtle",
  "time",
  "version_check",
 ]
@@ -2721,6 +2744,7 @@ dependencies = [
  "argon2",
  "axum",
  "axum-extra",
+ "axum-flash",
  "axum-macros",
  "base64 0.21.2",
  "chrono",

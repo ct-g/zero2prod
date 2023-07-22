@@ -7,11 +7,13 @@ use sqlx::postgres::PgPoolOptions;
 
 use axum::{
     Extension,
+    extract::FromRef,
     Router,
     routing::{get, post, IntoMakeService},
     Server, // Re-export of Server from hyper crate
 };
-use secrecy::Secret;
+use axum_flash::Key;
+use secrecy::{Secret, ExposeSecret};
 use tower_http::trace::{TraceLayer, self};
 use tower::ServiceBuilder;
 use tracing::Level;
@@ -52,6 +54,7 @@ impl Application {
             connection_pool,
             email_client,
             configuration.application.base_url,
+            configuration.application.hmac_secret,
         )?;
 
         Ok(Self { port, server })
@@ -74,19 +77,34 @@ pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     )
 }
 
-pub struct HmacSecret(pub Secret<String>);
+#[derive(Clone)]
+pub struct AppState {
+    flash_config: axum_flash::Config,
+}
+
+impl FromRef<AppState> for axum_flash::Config {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.flash_config.clone()
+    }
+}
 
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
+    hmac_secret: Secret<String>,
 ) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, hyper::Error> {
     // State must be cloneable for the into_make_service call, hence Arc
     let db_pool = Arc::new(db_pool);
     let email_client = Arc::new(email_client);
     let base_url = ApplicationBaseUrl(base_url);
-
+    let app_state = AppState {
+        flash_config:
+            axum_flash::Config::new(
+                Key::from(hmac_secret.expose_secret().as_bytes())
+            ),
+    };
     let app = Router::new()
         .route("/", get(home))
         .route("/health_check", get(health_check))
@@ -111,7 +129,8 @@ pub fn run(
         )
         .layer(Extension(db_pool))
         .layer(Extension(email_client))
-        .layer(Extension(base_url));        
+        .layer(Extension(base_url))
+        .with_state(app_state);
 
     let server = Server::from_tcp(listener)?
         .serve(app.into_make_service());
