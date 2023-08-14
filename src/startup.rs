@@ -1,6 +1,6 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, home, subscribe, confirm, publish_newsletter, login_form, login};
+use crate::routes::{health_check, home, subscribe, confirm, publish_newsletter, login_form, login, admin_dashboard};
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -13,6 +13,7 @@ use axum::{
     Server, // Re-export of Server from hyper crate
 };
 use axum_flash::Key;
+use axum_session::{SessionStore, SessionConfig, SessionLayer, SessionRedisPool};
 use secrecy::{Secret, ExposeSecret};
 use tower_http::trace::{TraceLayer, self};
 use tower::ServiceBuilder;
@@ -31,7 +32,7 @@ pub struct ApplicationBaseUrl(pub String);
 impl Application {
     pub async fn build(
         configuration: Settings
-    ) -> Result<Self, hyper::Error> {
+    ) -> Result<Self, anyhow::Error> {
         let connection_pool = get_connection_pool(&configuration.database); 
     
         let sender_email = configuration
@@ -55,7 +56,8 @@ impl Application {
             email_client,
             configuration.application.base_url,
             configuration.application.hmac_secret,
-        )?;
+            configuration.redis_uri,
+        ).await?;
 
         Ok(Self { port, server })
     }
@@ -88,21 +90,27 @@ impl FromRef<AppState> for axum_flash::Config {
     }
 }
 
-pub fn run(
+pub async fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
     hmac_secret: Secret<String>,
-) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, hyper::Error> {
+    redis_uri: Secret<String>,
+) -> Result<Server<hyper::server::conn::AddrIncoming, IntoMakeService<Router>>, anyhow::Error> {
     // State must be cloneable for the into_make_service call, hence Arc
     let db_pool = Arc::new(db_pool);
     let email_client = Arc::new(email_client);
     let base_url = ApplicationBaseUrl(base_url);
+
+    let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
+
+    let redis = redis::Client::open(redis_uri.expose_secret().as_str())?;
+    let redis_store = SessionStore::<SessionRedisPool>::new(Some(redis.into()), SessionConfig::new()).await?;
     let app_state = AppState {
         flash_config:
             axum_flash::Config::new(
-                Key::from(hmac_secret.expose_secret().as_bytes())
+                secret_key.clone()
             ),
     };
     let app = Router::new()
@@ -113,6 +121,8 @@ pub fn run(
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
+        .route("/admin/dashbaord", get(admin_dashboard))
+        .layer(SessionLayer::new(redis_store))
         .layer(
             ServiceBuilder::new()
                 .layer(

@@ -71,7 +71,7 @@ pub async fn login(
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
             let mut response = StatusCode::SEE_OTHER.into_response();
-            let header_value = HeaderValue::from_str("/").unwrap();
+            let header_value = HeaderValue::from_str("/admin/dashboard").unwrap();
             response
                 .headers_mut()
                 .insert(header::LOCATION, header_value);
