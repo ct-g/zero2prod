@@ -11,6 +11,7 @@ use axum::{
     response::{IntoResponse, Response}
 };
 use axum_flash::Flash;
+use axum_session::{Session, SessionRedisPool};
 use secrecy::Secret;
 use sqlx::PgPool;
 
@@ -57,6 +58,7 @@ impl IntoResponse for LoginError {
 pub async fn login(
     Extension(pool): Extension<Arc<PgPool>>,
     flash: Flash,
+    session: Session<SessionRedisPool>,
     form: Form<FormData>
 ) -> Result<Response, Response> {
     let credentials = Credentials {
@@ -70,6 +72,9 @@ pub async fn login(
         Ok(user_id) => {
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
+            session.renew();
+            session.set("user_id", user_id);
+
             let mut response = StatusCode::SEE_OTHER.into_response();
             let header_value = HeaderValue::from_str("/admin/dashboard").unwrap();
             response

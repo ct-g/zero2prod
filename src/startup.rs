@@ -121,7 +121,7 @@ pub async fn run(
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
-        .route("/admin/dashbaord", get(admin_dashboard))
+        .route("/admin/dashboard", get(admin_dashboard))
         .layer(SessionLayer::new(redis_store))
         .layer(
             ServiceBuilder::new()
