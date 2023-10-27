@@ -1,5 +1,6 @@
 use crate::authentication::{validate_credentials, Credentials, AuthError};
 use crate::routes::error_chain_fmt;
+use crate::session_state::TypedSession;
 
 use axum::{
     Extension,
@@ -11,7 +12,7 @@ use axum::{
     response::{IntoResponse, Response}
 };
 use axum_flash::Flash;
-use axum_session::{Session, SessionRedisPool};
+use axum_session::SessionRedisPool;
 use secrecy::Secret;
 use sqlx::PgPool;
 
@@ -58,7 +59,7 @@ impl IntoResponse for LoginError {
 pub async fn login(
     Extension(pool): Extension<Arc<PgPool>>,
     flash: Flash,
-    session: Session<SessionRedisPool>,
+    session: TypedSession<SessionRedisPool>,
     form: Form<FormData>
 ) -> Result<Response, Response> {
     let credentials = Credentials {
@@ -73,7 +74,7 @@ pub async fn login(
             tracing::Span::current()
                 .record("user_id", &tracing::field::display(&user_id));
             session.renew();
-            session.set("user_id", user_id);
+            session.insert_user_id(user_id);
 
             let mut response = StatusCode::SEE_OTHER.into_response();
             let header_value = HeaderValue::from_str("/admin/dashboard").unwrap();

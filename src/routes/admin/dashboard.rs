@@ -1,10 +1,12 @@
+use crate::session_state::TypedSession;
+
 use anyhow::Context;
 use axum::{
     http::{StatusCode, header::{self, HeaderMap, HeaderValue}},
     response::IntoResponse,
     Extension,
 };
-use axum_session::{Session, SessionRedisPool};
+use axum_session::SessionRedisPool;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -13,9 +15,9 @@ use std::sync::Arc;
 // TODO took shortcuts regarding error handling, differs from section 10.7.5.2
 pub async fn admin_dashboard(
     Extension(pool): Extension<Arc<PgPool>>,
-    session: Session<SessionRedisPool>,
+    session: TypedSession<SessionRedisPool>,
 ) -> impl IntoResponse {
-    let username = match session.get::<Uuid>("user_id") {
+    let username = match session.get_user_id() {
         Some(user_id) => match get_username(user_id, &pool).await {
             Ok(username) => username,
             Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response()
