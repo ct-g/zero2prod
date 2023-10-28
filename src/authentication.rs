@@ -61,10 +61,14 @@ fn verify_password_hash(
     expected_password_hash: Secret<String>,
     password_candidate: Secret<String>,
 ) -> Result<(), AuthError> {
+    tracing::error!("expected: {}", &expected_password_hash.expose_secret());
     let expected_password_hash = PasswordHash::new(
         &expected_password_hash.expose_secret()
-    )
-    .context("Failed to parse hash in PHC string format.")?;
+    );
+    tracing::error!("password hash result: {:?}", &expected_password_hash);
+
+    let expected_password_hash = expected_password_hash
+        .context("Failed to parse hash in PHC string format.")?;
 
     Argon2::default()
         .verify_password(
