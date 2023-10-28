@@ -5,7 +5,7 @@ use axum::{
     },
     response::{IntoResponse, Response},
 };
-use axum_flash::{IncomingFlashes, Level};
+use axum_flash::IncomingFlashes;
 
 use std::fmt::Write;
 
@@ -13,7 +13,7 @@ pub async fn login_form(
     flashes: IncomingFlashes,
 ) -> Response {
     let mut error_html = String::new();
-    for (_, msg) in flashes.iter().filter(|(l, _)| *l == Level::Error) {
+    for (_, msg) in flashes.iter() {
         writeln!(
             error_html,
             "<p><i>{}</i></p>",

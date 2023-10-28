@@ -1,7 +1,7 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
-use crate::routes::error_chain_fmt;
+use crate::error::error_chain_fmt;
 
 use anyhow::Context;
 use axum::{

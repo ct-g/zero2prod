@@ -27,6 +27,10 @@ where
     pub fn get_user_id(&self) -> Option<Uuid> {
         self.0.get(Self::USER_ID_KEY)
     }
+
+    pub fn logout(&self) {
+        self.0.clear()
+    }
 }
 
 #[async_trait]

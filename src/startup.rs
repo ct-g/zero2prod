@@ -1,6 +1,12 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, home, subscribe, confirm, publish_newsletter, login_form, login, admin_dashboard};
+use crate::routes::{
+    health_check,
+    home,
+    subscribe, confirm,
+    publish_newsletter,
+    login_form, login, admin_dashboard, change_password_form, change_password, logout
+};
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -122,6 +128,9 @@ pub async fn run(
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
         .route("/admin/dashboard", get(admin_dashboard))
+        .route("/admin/password", get(change_password_form::<SessionRedisPool>))
+        .route("/admin/password", post(change_password::<SessionRedisPool>))
+        .route("/admin/logout", post(logout::<SessionRedisPool>))
         .layer(SessionLayer::new(redis_store))
         .layer(
             ServiceBuilder::new()

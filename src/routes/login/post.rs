@@ -1,5 +1,5 @@
 use crate::authentication::{validate_credentials, Credentials, AuthError};
-use crate::routes::error_chain_fmt;
+use crate::error::error_chain_fmt;
 use crate::session_state::TypedSession;
 
 use axum::{
