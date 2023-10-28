@@ -1,5 +1,5 @@
 use crate::{
-    session_state::TypedSession,
+    authentication::UserId,
     error::ResponseError,
     routes::admin::dashboard::get_username, authentication::{Credentials, validate_credentials, AuthError}
 };
@@ -23,40 +23,36 @@ pub struct FormData {
 }
 
 pub async fn change_password<T>(
-    session: TypedSession<T>,
+    Extension(user_id): Extension<UserId>,
     flash: Flash,
     Extension(pool): Extension<Arc<PgPool>>,
     form: Form<FormData>
-) -> impl IntoResponse
+) -> Result<impl IntoResponse, ResponseError>
 where
     T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
 {
-    let user_id = session.get_user_id();
-    if user_id.is_none() {
-        return axum::response::Redirect::to("/login").into_response();
-    }
-    let user_id = user_id.unwrap();
+    let user_id = user_id;
 
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
         let flash = flash.error(
             "You entered two different new passwords - the field values must match."
         );
         let response = axum::response::Redirect::to("/admin/password");
-        return (flash, response).into_response();
+        return Ok((flash, response).into_response());
     }
 
     if form.new_password.expose_secret().len() < 12 {
         let flash = flash.error("Password needs to be at least 12 characters.");
-        return (flash, axum::response::Redirect::to("/admin/password")).into_response();
+        return Ok((flash, axum::response::Redirect::to("/admin/password")).into_response());
     }
     if form.new_password.expose_secret().len() >= 128 {
         let flash = flash.error("Password must be less than 128 characters.");
-        return (flash, axum::response::Redirect::to("/admin/password")).into_response();
+        return Ok((flash, axum::response::Redirect::to("/admin/password")).into_response());
     }
 
-    let username = match get_username(user_id, &pool).await {
+    let username = match get_username(*user_id, &pool).await {
         Ok(username) => username,
-        Err(e) => return ResponseError::from(e).into_response(),
+        Err(e) => return Err(ResponseError::from(e)),
     };
 
     let credentials = Credentials {
@@ -67,16 +63,16 @@ where
         return match e {
             AuthError::InvalidCredentials(_) => {
                 let flash = flash.error("The current password is incorrect.");
-                (flash, axum::response::Redirect::to("/admin/password")).into_response()
+                Ok((flash, axum::response::Redirect::to("/admin/password")).into_response())
             },
-            AuthError::UnexpectedError(_) => ResponseError::from(e).into_response(),
+            AuthError::UnexpectedError(_) => Err(ResponseError::from(e)),
         }
     }
 
-    match crate::authentication::change_password(user_id, form.0.new_password, &pool).await {
+    match crate::authentication::change_password(*user_id, form.0.new_password, &pool).await {
         Ok(_) => (),
-        Err(e) => return ResponseError::from(e).into_response(),
+        Err(e) => return Err(ResponseError::from(e)),
     }
     let flash = flash.error("Your password has been changed.");
-    (flash, axum::response::Redirect::to("/admin/password")).into_response()
+    Ok((flash, axum::response::Redirect::to("/admin/password")).into_response())
 }

@@ -1,5 +1,3 @@
-use crate::session_state::TypedSession;
-
 use axum::{
     http::{
         header::{self, HeaderValue, HeaderMap},
@@ -13,16 +11,11 @@ use std::fmt::Write;
 
 
 pub async fn change_password_form<T>(
-    session: TypedSession<T>,
     flash_messages: IncomingFlashes,
 ) -> impl IntoResponse
 where
     T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
 {
-    if session.get_user_id().is_none() {
-        return axum::response::Redirect::to("/login").into_response();
-    };
-
     let mut msg_html = String::new();
     for (_, msg) in flash_messages.iter().filter(|(l, _)| *l == Level::Error) {
         writeln!(

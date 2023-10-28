@@ -9,11 +9,7 @@ pub async fn logout<T>(
 where
     T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
 {
-    if session.get_user_id().is_none() {
-        return axum::response::Redirect::to("/login").into_response();
-    } else {
-        session.logout();
-        let flash = flash.info("You have been successfully logged out.");
-        return (flash, axum::response::Redirect::to("/login")).into_response();
-    }
+    session.logout();
+    let flash = flash.info("You have been successfully logged out.");
+    return (flash, axum::response::Redirect::to("/login")).into_response();
 }

@@ -1,3 +1,4 @@
+use crate::authentication::reject_anonymous_users;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
@@ -8,6 +9,7 @@ use crate::routes::{
     login_form, login, admin_dashboard, change_password_form, change_password, logout
 };
 
+use axum::middleware;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 
@@ -119,6 +121,13 @@ pub async fn run(
                 secret_key.clone()
             ),
     };
+    let admin_routes = Router::new()
+        .route("/admin/dashboard", get(admin_dashboard))
+        .route("/admin/password", get(change_password_form::<SessionRedisPool>))
+        .route("/admin/password", post(change_password::<SessionRedisPool>))
+        .route("/admin/logout", post(logout::<SessionRedisPool>))
+        .layer(middleware::from_fn_with_state(app_state.clone(), reject_anonymous_users));
+
     let app = Router::new()
         .route("/", get(home))
         .route("/health_check", get(health_check))
@@ -127,10 +136,7 @@ pub async fn run(
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
-        .route("/admin/dashboard", get(admin_dashboard))
-        .route("/admin/password", get(change_password_form::<SessionRedisPool>))
-        .route("/admin/password", post(change_password::<SessionRedisPool>))
-        .route("/admin/logout", post(logout::<SessionRedisPool>))
+        .merge(admin_routes)
         .layer(SessionLayer::new(redis_store))
         .layer(
             ServiceBuilder::new()
