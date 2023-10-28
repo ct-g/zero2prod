@@ -22,7 +22,14 @@ pub async fn admin_dashboard(
             Ok(username) => username,
             Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response()
         },
-        None => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        None => {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                header::LOCATION,
+                HeaderValue::from_str("/login").unwrap(),
+            );
+            return (StatusCode::SEE_OTHER, headers).into_response();
+        },
     };
     let mut headers = HeaderMap::new();
     headers.insert(
