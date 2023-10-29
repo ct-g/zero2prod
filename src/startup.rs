@@ -6,7 +6,7 @@ use crate::routes::{
     home,
     subscribe, confirm,
     publish_newsletter,
-    login_form, login, admin_dashboard, change_password_form, change_password, logout
+    login_form, login, admin_dashboard, change_password_form, change_password, logout, publish_newsletter_form
 };
 
 use axum::middleware;
@@ -126,6 +126,8 @@ pub async fn run(
         .route("/admin/password", get(change_password_form::<SessionRedisPool>))
         .route("/admin/password", post(change_password::<SessionRedisPool>))
         .route("/admin/logout", post(logout::<SessionRedisPool>))
+        .route("/admin/newsletters", get(publish_newsletter_form::<SessionRedisPool>))
+        .route("/admin/newsletters", post(publish_newsletter::<SessionRedisPool>))
         .layer(middleware::from_fn_with_state(app_state.clone(), reject_anonymous_users));
 
     let app = Router::new()
@@ -135,7 +137,6 @@ pub async fn run(
         .route("/login", post(login))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
-        .route("/newsletters", post(publish_newsletter))
         .merge(admin_routes)
         .layer(SessionLayer::new(redis_store))
         .layer(

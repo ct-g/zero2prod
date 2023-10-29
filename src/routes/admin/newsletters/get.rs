@@ -9,7 +9,7 @@ use axum_flash::IncomingFlashes;
 
 use std::fmt::Write;
 
-pub async fn change_password_form<T>(
+pub async fn publish_newsletter_form<T>(
     flash_messages: IncomingFlashes,
 ) -> impl IntoResponse
 where
@@ -33,32 +33,32 @@ where
         </head>
         <body>
         {msg_html}
-        <form action="/admin/password" method="post">
-            <label>Current password
+        <form action="/admin/newsletters" method="post">
+            <label>Title
                 <input
-                    type="password"
-                    placeholder="Enter current password"
-                    name="current_password"
+                    type="text"
+                    placeholder="Enter newsletter title"
+                    name="title"
                 >
             </label>
             <br>
-            <label>New password
+            <label>Contents
                 <input
-                    type="password"
-                    placeholder="Enter new password"
-                    name="new_password"
+                    type="text"
+                    placeholder="Enter content in HTML form"
+                    name="html"
                 >
             </label>
             <br>
-            <label>Confirm new password
+            <label>Contents raw text
                 <input
-                    type="password"
-                    placeholder="Type the new password again"
-                    name="new_password_check"
+                    type="text"
+                    placeholder="Enter content in text form"
+                    name="text"
                 >
             </label>
             <br>
-            <button type="submit">Change password</button>
+            <button type="submit">Publish newsletter</button>
         </form>
         <p><a href="/admin/dashboard">&lt;- Back</a></p>
         </body>

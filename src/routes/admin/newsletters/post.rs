@@ -1,4 +1,4 @@
-use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::authentication::UserId;
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::error_chain_fmt;
@@ -6,14 +6,12 @@ use crate::error::error_chain_fmt;
 use anyhow::Context;
 use axum::{
     Extension,
-    extract,
-    http::{header::HeaderMap, header::HeaderValue, StatusCode},
+    Form,
+    http::{header::HeaderValue, StatusCode},
     response::{IntoResponse, Response}
 };
-use axum_macros::debug_handler;
-use base64::Engine;
+use axum_flash::Flash;
 use hyper::header;
-use secrecy::Secret;
 use sqlx::PgPool;
 
 use std::sync::Arc;
@@ -23,15 +21,10 @@ struct ConfirmedSubscriber {
 }
 
 #[derive(serde::Deserialize)]
-pub struct BodyData {
+pub struct NewsletterFormData {
     title: String,
-    content: Content,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Content {
-    html: String,
     text: String,
+    html: String,
 }
 
 #[derive(thiserror::Error)]
@@ -64,30 +57,21 @@ impl IntoResponse for PublishError {
     }
 }
 
-#[debug_handler]
 #[tracing::instrument(
     name = "Publish a newsletter issue",
-    skip(body, pool, email_client, headers),
+    skip(form, pool, email_client),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
-pub async fn publish_newsletter(
+pub async fn publish_newsletter<T>(
+    flash: Flash,
+    Extension(user_id): Extension<UserId>,
     Extension(pool): Extension<Arc<PgPool>>,
     Extension(email_client): Extension<Arc<EmailClient>>,
-    headers: HeaderMap,
-    extract::Json(body): extract::Json<BodyData>
-) -> Result<StatusCode, PublishError> {
-    let credentials = basic_authentication(&headers)
-        .map_err(PublishError::AuthError)?;
-    tracing::Span::current().record(
-        "username",
-        &tracing::field::display(&credentials.username)
-    );
-    let user_id = validate_credentials(credentials, &pool)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
-        })?;
+    Form(form): Form<NewsletterFormData>,
+) -> Result<impl IntoResponse, PublishError>
+where
+    T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
+{
     tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
 
     let subscribers = get_confirmed_subscribers(&pool).await?;
@@ -97,9 +81,9 @@ pub async fn publish_newsletter(
                 email_client
                 .send_email(
                     &subscriber.email,
-                    &body.title,
-                    &body.content.html,
-                    &body.content.text,
+                    &form.title,
+                    &form.html,
+                    &form.text,
                 )
                 .await
                 .with_context(|| {
@@ -116,43 +100,8 @@ pub async fn publish_newsletter(
         }
 
     }
-    Ok(StatusCode::OK)
-}
-
-fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
-    let header_value = headers
-        .get("Authorization")
-        .context("The 'Authorization' header was missing")?
-        .to_str()
-        .context("The 'Authorization' header was not a valid UTF8 string")?;
-    let base64encoded_segment = header_value
-        .strip_prefix("Basic ")
-        .context("The authorization scheme was not 'Basic'.")?;
-    let decoded_bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64encoded_segment)
-        .context("Failed to base64-decode 'Basic' credentials.")?;
-    let decoded_credentials = String::from_utf8(decoded_bytes)
-        .context("The decoded credential string is not valid UTF8")?;
-
-    // Split into username:password
-    let mut credentials = decoded_credentials.splitn(2, ':');
-    let username = credentials
-        .next()
-        .ok_or_else(|| {
-            anyhow::anyhow!("A username must be provided in 'Basic' auth.")
-        })?
-        .to_string();
-    let password = credentials
-        .next()
-        .ok_or_else(|| {
-            anyhow::anyhow!("A password must be provided in 'Basic' auth.")
-        })?
-        .to_string();
-    
-    Ok(Credentials {
-        username,
-        password: Secret::new(password)
-    })
+    let flash = flash.info("The newsletter has been published.");
+    Ok((flash, axum::response::Redirect::to("/admin/newsletters")).into_response())
 }
 
 #[tracing::instrument(name = "Get confirmed subscribers", skip(pool))]

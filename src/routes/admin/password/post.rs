@@ -31,8 +31,6 @@ pub async fn change_password<T>(
 where
     T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
 {
-    let user_id = user_id;
-
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
         let flash = flash.error(
             "You entered two different new passwords - the field values must match."
