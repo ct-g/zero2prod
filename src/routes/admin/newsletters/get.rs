@@ -24,6 +24,8 @@ where
         ).unwrap();
     }
 
+    let idempotency_key = uuid::Uuid::new_v4();
+
     let html = format!(
         r#"<!DOCTYPE html>
         <html lang="en">
@@ -58,6 +60,7 @@ where
                 >
             </label>
             <br>
+            <input hidden type="text" name="idempotency_key" value="{idempotency_key}">
             <button type="submit">Publish newsletter</button>
         </form>
         <p><a href="/admin/dashboard">&lt;- Back</a></p>

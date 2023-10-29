@@ -1,7 +1,8 @@
-use crate::authentication::UserId;
+use crate::{authentication::UserId, error::ResponseError};
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::error_chain_fmt;
+use crate::idempotency::{IdempotencyKey, save_response, try_processing, NextAction};
 
 use anyhow::Context;
 use axum::{
@@ -25,6 +26,7 @@ pub struct NewsletterFormData {
     title: String,
     text: String,
     html: String,
+    idempotency_key: String,
 }
 
 #[derive(thiserror::Error)]
@@ -72,7 +74,26 @@ pub async fn publish_newsletter<T>(
 where
     T: axum_session::DatabasePool + Clone + std::fmt::Debug + Sync + Send + 'static
 {
-    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+    let NewsletterFormData { title, text, html, idempotency_key } = form;
+    let idempotency_key: IdempotencyKey =
+        match idempotency_key.try_into(){
+            Ok(key) => key,
+            Err(e) => {
+                let internal_error: Box<dyn std::error::Error> = e.into();
+                return Ok(ResponseError::new(StatusCode::BAD_REQUEST, internal_error).into_response())
+            }
+        };
+    // Return early if a saved response is found in the database
+    let transaction = match try_processing(&pool, &idempotency_key, *user_id)
+        .await
+        .map_err(PublishError::UnexpectedError)?
+    {
+        NextAction::StartProcessing(t) => t,
+        NextAction::ReturnSavedResponse(saved_response) => {
+            let flash = flash.info("The newsletter has been published.");
+            return Ok((flash, saved_response).into_response());
+        }
+    };
 
     let subscribers = get_confirmed_subscribers(&pool).await?;
     for subscriber in subscribers {
@@ -81,9 +102,9 @@ where
                 email_client
                 .send_email(
                     &subscriber.email,
-                    &form.title,
-                    &form.html,
-                    &form.text,
+                    &title,
+                    &html,
+                    &text,
                 )
                 .await
                 .with_context(|| {
@@ -101,7 +122,12 @@ where
 
     }
     let flash = flash.info("The newsletter has been published.");
-    Ok((flash, axum::response::Redirect::to("/admin/newsletters")).into_response())
+    let redirect = axum::response::Redirect::to("/admin/newsletters");
+    let response = (flash, redirect).into_response();   
+    let response = save_response(transaction, &idempotency_key, *user_id, response)
+        .await
+        .map_err(PublishError::UnexpectedError)?;
+    Ok(response)
 }
 
 #[tracing::instrument(name = "Get confirmed subscribers", skip(pool))]
