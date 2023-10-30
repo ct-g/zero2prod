@@ -38,3 +38,10 @@ Running
 
     Pipe into bunyan for formatted logs
         docker run -p 8000:8000 zero2prod | bunyan
+
+Post-Mortem
+    App compiles and passes tests
+    Failed to send confirmation email in production
+    Attempting to resubmit email fails to insert into DB as it already exists
+        Ideally, only inserted into DB after confirmation email is successfully sent
+    Failure appears to be due to some restrictions on PostMark account
